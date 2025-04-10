@@ -35,12 +35,12 @@ public:
     progress_ = value;
 }
 
-    void update(float value, int startXPos, int startYPos, int index = 0) {
+    void update(float value, int startXPos, int startYPos, int index = 0, size_t size = 1) {
     set_progress(value);
-    write_progress(index, startXPos, startYPos);
+    write_progress(index, startXPos, startYPos, size);
 }
 
-    void write_progress(int index, int startXPos, int startYPos) {
+    void write_progress(int index, int startXPos, int startYPos, size_t size) {
     std::unique_lock lock{mutex_};
     if (progress_ > 50.0f) return;
 
@@ -61,6 +61,7 @@ public:
       std::cout << "]";
       std::chrono::duration<float> duration = std::chrono::system_clock::now() - start;
       std::cout << "Elapsed time: " << duration.count() << " s";
+      SetCursorPos(0, startYPos + size); //THIS IS TO PREVENT OVERWRITING BARS AFTER RETURNING CONTROL TO TERMINAL
     }
 
 }
@@ -83,12 +84,12 @@ public:
     tcgetattr(t, &sav);
     struct termios opt = sav;
     opt.c_lflag &= ~(ECHO | ICANON);
-    // but better just cfmakeraw(&opt);
+
     tcsetattr(t, TCSANOW, &opt);
     printf("\033[6n");
     fflush(stdout);
     scanf("\033[%d;%dR", &YPos, &XPos);
-    tcsetattr(t, TCSANOW, &sav); //COMMENTING OUT THIS LINE MAKES TERMINAL UNRESPONSIVE
+    tcsetattr(t, TCSANOW, &sav);
 }
     int getXPos() { return XPos; }
     int getYPos() { return YPos; }
@@ -110,12 +111,13 @@ public:
     //std::unique_lock lock{mutex_};
 
     // Write current state of the bar
-    bars_[index].write_progress(index, XPos,YPos);
+    bars_[index].write_progress(index, XPos,YPos, bars_.size());
     //std::cout << "\n";
 
     if (!started_)
         started_ = true;
 }
+
 };
 
 
@@ -134,7 +136,7 @@ int main() {
     auto job1 = [&bars]() {
         for (size_t i = 0; i <= 50; ++i) {
             bars.update(0,i);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
     };
 
@@ -142,7 +144,7 @@ int main() {
     auto job2 = [&bars]() {
         for (size_t i = 0; i <= 50; ++i) {
             bars.update(1,i);
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     };
 
@@ -150,7 +152,7 @@ int main() {
     auto job3 = [&bars]() {
         for (size_t i = 0; i <= 50; ++i) {
             bars.update(2,i);
-            std::this_thread::sleep_for(std::chrono::milliseconds(60));
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
         }
     };
 
@@ -162,7 +164,5 @@ int main() {
     second_job.join();
     third_job.join();
     
-    std::cout << std::endl;
-
-    // std::cout << termcolor::reset;
+    //std::cout << std::endl;
 }
